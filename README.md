@@ -69,3 +69,7 @@ The main difference between these three architectures lies in how control and re
 This simulation provides a simplified visualization of decentralized networking concepts to help users understand how these architectures function. It is intended as an introductory educational tool rather than a complete representation of real-world networking systems.
 
 **Source (adapted and translated):** MikWeb – *Rede Descentralizada*. Available at: https://www.mikweb.com.br/rede-descentralizada/
+
+## Development
+
+This project was developed with the assistance of the Kimi 2.6 AI model using its High Reasoning mode. AI was used as a development tool to support the design, implementation, debugging, and refinement of the simulation.
