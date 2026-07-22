@@ -1,0 +1,996 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador 3D — Rede Descentralizada Mesh</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg-panel: rgba(15, 15, 25, 0.92);
+    --bg-card: rgba(20, 20, 35, 0.85);
+    --text-primary: #e8e8ec;
+    --text-secondary: #a0a0b0;
+    --text-tertiary: #6a6a7a;
+    --text-quaternary: #4a4a5a;
+    --border: rgba(255,255,255,0.08);
+    --accent: #3b82f6;
+    --accent-glow: rgba(59,130,246,0.3);
+    --positive: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --chart-1: #3b82f6;
+    --chart-2: #ef4444;
+    --chart-3: #22c55e;
+    --chart-4: #a855f7;
+    --chart-5: #6b7280;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "SF Mono", "Fira Code", "JetBrains Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f5f7;
+      --bg-panel: rgba(255,255,255,0.92);
+      --bg-card: rgba(255,255,255,0.85);
+      --text-primary: #1a1a2e;
+      --text-secondary: #4a4a5a;
+      --text-tertiary: #7a7a8a;
+      --text-quaternary: #a0a0b0;
+      --border: rgba(0,0,0,0.08);
+      --accent: #2563eb;
+      --accent-glow: rgba(37,99,235,0.25);
+      --positive: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; font-family: var(--font-sans); background: var(--bg); color: var(--text-primary); }
+
+  #app { position: relative; width: 100%; height: 100%; }
+  canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+
+  /* HUD */
+  .hud {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    pointer-events: none;
+    z-index: 10;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .hud-panel {
+    background: var(--bg-panel);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    pointer-events: auto;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    min-width: 220px;
+  }
+
+  .hud-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    letter-spacing: -0.2px;
+  }
+
+  .hud-meta {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .hud-badges {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+  }
+
+  .badge-online {
+    color: var(--positive);
+    background: color-mix(in srgb, var(--positive) 12%, transparent);
+    border-color: color-mix(in srgb, var(--positive) 20%, transparent);
+  }
+
+  .badge-neutral {
+    color: var(--text-tertiary);
+    background: color-mix(in srgb, var(--text-quaternary) 12%, transparent);
+    border-color: var(--border);
+  }
+
+  .controls-panel {
+    min-width: 180px;
+  }
+
+  .controls-title {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+  }
+
+  .control-row svg { flex-shrink: 0; opacity: 0.7; }
+
+  /* Detail Panel */
+  .detail-panel {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(140%);
+    width: 92%;
+    max-width: 460px;
+    background: var(--bg-panel);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    pointer-events: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 20;
+  }
+
+  .detail-panel.open { transform: translateX(-50%) translateY(0); }
+
+  .detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .detail-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .detail-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .detail-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+
+  .detail-subtitle {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+    font-family: var(--font-mono);
+  }
+
+  .detail-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .detail-close:hover {
+    background: color-mix(in srgb, var(--text-quaternary) 15%, transparent);
+    color: var(--text-primary);
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .detail-card {
+    background: var(--bg-card);
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  .detail-card-label {
+    font-size: 11px;
+    color: var(--text-quaternary);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .detail-card-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .detail-peers {
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  .detail-peers-label {
+    margin-bottom: 6px;
+    color: var(--text-secondary);
+  }
+
+  .peer-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .peer-tag {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  .progress-bar {
+    margin-top: 8px;
+    height: 5px;
+    background: color-mix(in srgb, var(--text-quaternary) 20%, transparent);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
+    font-size: 11px;
+    margin-top: 5px;
+    text-align: right;
+    color: var(--text-quaternary);
+  }
+
+  /* Loading overlay */
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transition: opacity 0.6s ease;
+  }
+
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .loading-text {
+    margin-top: 16px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .hud { flex-direction: column; align-items: stretch; }
+    .hud-panel { min-width: unset; }
+    .controls-panel { order: -1; }
+    .detail-panel { padding: 14px; border-radius: 12px; }
+    .detail-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="loading-overlay" id="loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Inicializando simulação mesh…</div>
+  </div>
+
+  <canvas id="network-canvas"></canvas>
+
+  <div class="hud">
+    <div class="hud-panel">
+      <div class="hud-title">Rede descentralizada — mesh</div>
+      <div class="hud-meta">
+        <span id="hud-nodes">12 nós ativos</span> · <span id="hud-connections">66 conexões</span> · <span id="hud-packets">0 pacotes</span>
+      </div>
+      <div class="hud-badges">
+        <span class="badge badge-online">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          Online
+        </span>
+        <span class="badge badge-neutral">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <span id="hud-uptime">00:00</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="hud-panel controls-panel">
+      <div class="controls-title">Controles</div>
+      <div class="control-row">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l4-4 4 4M5 15l4 4 4-4"/></svg>
+        Zoom: scroll do mouse
+      </div>
+      <div class="control-row">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 17l-4-4 4-4M16 17l4-4-4-4"/></svg>
+        Rotacionar: arrastar
+      </div>
+      <div class="control-row">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Clicar: ver detalhes
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-header">
+      <div class="detail-header-left">
+        <div class="detail-icon" id="detail-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </div>
+        <div>
+          <div class="detail-title" id="detail-title">Nó #01</div>
+          <div class="detail-subtitle" id="detail-subtitle">192.168.0.10</div>
+        </div>
+      </div>
+      <button class="detail-close" id="detail-close" aria-label="Fechar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const canvas = document.getElementById('network-canvas');
+  const ctx = canvas.getContext('2d');
+  const detailPanel = document.getElementById('detail-panel');
+  const detailTitle = document.getElementById('detail-title');
+  const detailSubtitle = document.getElementById('detail-subtitle');
+  const detailContent = document.getElementById('detail-content');
+  const detailIcon = document.getElementById('detail-icon');
+  const hudPackets = document.getElementById('hud-packets');
+  const hudUptime = document.getElementById('hud-uptime');
+  const loading = document.getElementById('loading');
+
+  let width, height, cx, cy, dpr;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx = width / 2;
+    cy = height / 2;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Camera
+  const camera = { rotX: 0.35, rotY: 0.5, zoom: 0.9, targetZoom: 0.9 };
+  const mouse = { x: 0, y: 0, down: false, lastX: 0, lastY: 0 };
+
+  // Icosahedron vertices for 12 nodes
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const rawNodes = [
+    [-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0],
+    [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi],
+    [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1]
+  ].map((p, i) => {
+    const len = Math.sqrt(p[0]*p[0] + p[1]*p[1] + p[2]*p[2]);
+    const scale = 200;
+    return {
+      id: i,
+      x: p[0]/len * scale,
+      y: p[1]/len * scale,
+      z: p[2]/len * scale,
+      name: `Nó-${String(i+1).padStart(2,'0')}`,
+      ip: `192.168.0.${10+i}`,
+      status: 'online',
+      files: Math.floor(Math.random() * 60) + 15,
+      bandwidth: Math.floor(Math.random() * 800) + 200,
+      connections: [],
+      lastActivity: Math.random() * 100
+    };
+  });
+
+  // Mesh connections
+  const connections = [];
+  for (let i = 0; i < rawNodes.length; i++) {
+    for (let j = i + 1; j < rawNodes.length; j++) {
+      const dx = rawNodes[i].x - rawNodes[j].x;
+      const dy = rawNodes[i].y - rawNodes[j].y;
+      const dz = rawNodes[i].z - rawNodes[j].z;
+      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      if (dist < 340) {
+        connections.push({ from: i, to: j, dist });
+        rawNodes[i].connections.push(j);
+        rawNodes[j].connections.push(i);
+      }
+    }
+  }
+  document.getElementById('hud-connections').textContent = connections.length + ' conexões';
+
+  const fileTypes = [
+    { name: 'relatorio_q2.pdf', size: '2.4 MB', type: 'document' },
+    { name: 'foto_evento.png', size: '856 KB', type: 'image' },
+    { name: 'contrato_v2.docx', size: '1.2 MB', type: 'document' },
+    { name: 'dados_sensores.csv', size: '45 KB', type: 'data' },
+    { name: 'backup_full.zip', size: '12 MB', type: 'archive' },
+    { name: 'chave_publica.pub', size: '3 KB', type: 'key' },
+    { name: 'apresentacao.mp4', size: '28 MB', type: 'video' },
+    { name: 'gravação_reuniao.wav', size: '4.1 MB', type: 'audio' },
+    { name: 'system_logs.txt', size: '156 KB', type: 'log' },
+    { name: 'config_rede.json', size: '8 KB', type: 'config' },
+    { name: 'dataset_train.csv', size: '34 MB', type: 'data' },
+    { name: 'patch_security.bin', size: '1.8 MB', type: 'binary' }
+  ];
+
+  const packets = [];
+  let packetCounter = 0;
+
+  function spawnPacket() {
+    const conn = connections[Math.floor(Math.random() * connections.length)];
+    const file = fileTypes[Math.floor(Math.random() * fileTypes.length)];
+    const isUrgent = Math.random() > 0.75;
+    packets.push({
+      from: conn.from,
+      to: conn.to,
+      progress: 0,
+      speed: 0.004 + Math.random() * 0.015,
+      file: file.name,
+      size: file.size,
+      fileType: file.type,
+      hash: '0x' + Math.random().toString(16).substr(2, 10).toUpperCase(),
+      priority: isUrgent ? 'urgent' : 'normal',
+      id: 'pkt-' + (++packetCounter),
+      created: Date.now()
+    });
+  }
+
+  // 3D projection
+  function project(x, y, z) {
+    let rx = x * Math.cos(camera.rotY) - z * Math.sin(camera.rotY);
+    let rz = x * Math.sin(camera.rotY) + z * Math.cos(camera.rotY);
+    let ry = y * Math.cos(camera.rotX) - rz * Math.sin(camera.rotX);
+    let rz2 = y * Math.sin(camera.rotX) + rz * Math.cos(camera.rotX);
+    const fov = 500;
+    const scale = camera.zoom * fov / (fov + rz2);
+    return { x: cx + rx * scale, y: cy + ry * scale, z: rz2, scale };
+  }
+
+  function unproject(mx, my, node) {
+    const p = project(node.x, node.y, node.z);
+    const dx = mx - p.x;
+    const dy = my - p.y;
+    return { dx, dy, dist: Math.sqrt(dx*dx + dy*dy), z: p.z, scale: p.scale };
+  }
+
+  let selectedNode = null;
+  let selectedPacket = null;
+  let hoverNode = null;
+  let time = 0;
+  let startTime = Date.now();
+  let frameCount = 0;
+
+  // Input
+  canvas.addEventListener('mousedown', e => {
+    mouse.down = true;
+    mouse.lastX = e.clientX;
+    mouse.lastY = e.clientY;
+  });
+
+  window.addEventListener('mouseup', () => { mouse.down = false; });
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+
+    if (mouse.down) {
+      const dx = e.clientX - mouse.lastX;
+      const dy = e.clientY - mouse.lastY;
+      camera.rotY += dx * 0.007;
+      camera.rotX += dy * 0.007;
+      camera.rotX = Math.max(-1.3, Math.min(1.3, camera.rotX));
+      mouse.lastX = e.clientX;
+      mouse.lastY = e.clientY;
+    } else {
+      let best = null, bestZ = -Infinity;
+      for (const node of rawNodes) {
+        const u = unproject(mouse.x, mouse.y, node);
+        if (u.dist < 24 * u.scale && u.z > bestZ) {
+          best = node; bestZ = u.z;
+        }
+      }
+      hoverNode = best;
+      canvas.style.cursor = hoverNode ? 'pointer' : 'grab';
+    }
+  });
+
+  canvas.addEventListener('click', e => {
+    if (Math.abs(e.clientX - mouse.lastX) > 4 || Math.abs(e.clientY - mouse.lastY) > 4) return;
+
+    let bestNode = null, bestNodeZ = -Infinity;
+    let bestPacket = null, bestPacketZ = -Infinity;
+
+    for (const node of rawNodes) {
+      const u = unproject(mouse.x, mouse.y, node);
+      if (u.dist < 24 * u.scale && u.z > bestNodeZ) {
+        bestNode = node; bestNodeZ = u.z;
+      }
+    }
+
+    if (bestNode) { showNodeDetail(bestNode); return; }
+
+    for (const pkt of packets) {
+      const n1 = rawNodes[pkt.from];
+      const n2 = rawNodes[pkt.to];
+      const p1 = project(n1.x, n1.y, n1.z);
+      const p2 = project(n2.x, n2.y, n2.z);
+      const px = p1.x + (p2.x - p1.x) * pkt.progress;
+      const py = p1.y + (p2.y - p1.y) * pkt.progress;
+      const dx = mouse.x - px;
+      const dy = mouse.y - py;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const pz = p1.z + (p2.z - p1.z) * pkt.progress;
+      if (dist < 16 && pz > bestPacketZ) {
+        bestPacket = pkt; bestPacketZ = pz;
+      }
+    }
+
+    if (bestPacket) { showPacketDetail(bestPacket); }
+    else { hideDetail(); }
+  });
+
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    camera.targetZoom *= e.deltaY > 0 ? 0.92 : 1.08;
+    camera.targetZoom = Math.max(0.25, Math.min(3.5, camera.targetZoom));
+  }, { passive: false });
+
+  // Touch support
+  let touchStartDist = 0;
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      mouse.down = true;
+      mouse.lastX = e.touches[0].clientX;
+      mouse.lastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      touchStartDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && mouse.down) {
+      const dx = e.touches[0].clientX - mouse.lastX;
+      const dy = e.touches[0].clientY - mouse.lastY;
+      camera.rotY += dx * 0.01;
+      camera.rotX += dy * 0.01;
+      camera.rotX = Math.max(-1.3, Math.min(1.3, camera.rotX));
+      mouse.lastX = e.touches[0].clientX;
+      mouse.lastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const delta = dist - touchStartDist;
+      camera.targetZoom *= 1 + delta * 0.003;
+      camera.targetZoom = Math.max(0.25, Math.min(3.5, camera.targetZoom));
+      touchStartDist = dist;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => { mouse.down = false; });
+
+  document.getElementById('detail-close').addEventListener('click', hideDetail);
+
+  function showNodeDetail(node) {
+    selectedNode = node;
+    selectedPacket = null;
+    detailTitle.textContent = node.name;
+    detailSubtitle.textContent = `Endereço IP: ${node.ip}`;
+    detailIcon.style.color = 'var(--accent)';
+    detailIcon.style.background = 'color-mix(in srgb, var(--accent) 15%, transparent)';
+    detailIcon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>';
+
+    const latency = Math.floor(Math.random() * 18 + 2);
+    const cpu = Math.floor(Math.random() * 40 + 10);
+    const mem = Math.floor(Math.random() * 30 + 20);
+
+    detailContent.innerHTML = `
+      <div class="detail-grid">
+        <div class="detail-card">
+          <div class="detail-card-label">Arquivos</div>
+          <div class="detail-card-value">${node.files}</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-label">Conexões</div>
+          <div class="detail-card-value">${node.connections.length}</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-label">Banda</div>
+          <div class="detail-card-value">${node.bandwidth} Mbps</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-label">Latência</div>
+          <div class="detail-card-value" style="color: var(--positive);">${latency} ms</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-label">CPU</div>
+          <div class="detail-card-value">${cpu}%</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-label">Memória</div>
+          <div class="detail-card-value">${mem}%</div>
+        </div>
+      </div>
+      <div class="detail-peers">
+        <div class="detail-peers-label">Peers conectados (${node.connections.length}):</div>
+        <div class="peer-tags">
+          ${node.connections.map(c => `<span class="peer-tag">Nó-${String(c+1).padStart(2,'0')}</span>`).join('')}
+        </div>
+      </div>
+    `;
+    detailPanel.classList.add('open');
+  }
+
+  function showPacketDetail(pkt) {
+    selectedPacket = pkt;
+    selectedNode = null;
+    detailTitle.textContent = pkt.file;
+    detailSubtitle.textContent = `Hash: ${pkt.hash}`;
+    const color = pkt.priority === 'urgent' ? 'var(--warning)' : 'var(--positive)';
+    const bg = pkt.priority === 'urgent' ? 'color-mix(in srgb, var(--warning) 15%, transparent)' : 'color-mix(in srgb, var(--positive) 15%, transparent)';
+    detailIcon.style.color = color;
+    detailIcon.style.background = bg;
+    detailIcon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>';
+
+    detailContent.innerHTML = `
+      <div class="detail-grid">
+        <div class="detail-card">
+          <div class="detail-card-label">Tamanho</div>
+          <div class="detail-card-value">${pkt.size}</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-label">Prioridade</div>
+          <div class="detail-card-value" style="color: ${color};">${pkt.priority === 'urgent' ? 'Urgente' : 'Normal'}</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-label">Tipo</div>
+          <div class="detail-card-value" style="text-transform: capitalize;">${pkt.fileType}</div>
+        </div>
+        <div class="detail-card">
+          <div class="detail-card-label">Tempo</div>
+          <div class="detail-card-value">${((Date.now() - pkt.created)/1000).toFixed(1)}s</div>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: var(--text-tertiary); line-height: 1.7; margin-top: 4px;">
+        <div>Origem: <span style="color: var(--text-secondary); font-family: var(--font-mono);">Nó-${String(pkt.from+1).padStart(2,'0')}</span></div>
+        <div>Destino: <span style="color: var(--text-secondary); font-family: var(--font-mono);">Nó-${String(pkt.to+1).padStart(2,'0')}</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width: ${Math.floor(pkt.progress*100)}%"></div></div>
+        <div class="progress-text">${Math.floor(pkt.progress*100)}% transmitido</div>
+      </div>
+    `;
+    detailPanel.classList.add('open');
+  }
+
+  function hideDetail() {
+    selectedNode = null;
+    selectedPacket = null;
+    detailPanel.classList.remove('open');
+  }
+
+  // Color helpers for canvas
+  function cssVar(name) {
+    const styles = getComputedStyle(document.documentElement);
+    return styles.getPropertyValue(name).trim();
+  }
+
+  let accentColor, positiveColor, warningColor, textPrimary, textSecondary, textTertiary, textQuaternary, borderColor;
+
+  function refreshColors() {
+    accentColor = cssVar('--accent');
+    positiveColor = cssVar('--positive');
+    warningColor = cssVar('--warning');
+    textPrimary = cssVar('--text-primary');
+    textSecondary = cssVar('--text-secondary');
+    textTertiary = cssVar('--text-tertiary');
+    textQuaternary = cssVar('--text-quaternary');
+    borderColor = cssVar('--border');
+  }
+  refreshColors();
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', refreshColors);
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', refreshColors);
+
+  // Main render loop
+  function draw() {
+    ctx.clearRect(0, 0, width, height);
+    time += 0.016;
+    frameCount++;
+
+    // Smooth zoom
+    camera.zoom += (camera.targetZoom - camera.zoom) * 0.08;
+
+    // Auto-rotate when idle
+    if (!mouse.down) {
+      camera.rotY += 0.0012;
+    }
+
+    // Spawn packets
+    if (Math.random() < 0.035 && packets.length < 30) spawnPacket();
+
+    // Update packets
+    for (let i = packets.length - 1; i >= 0; i--) {
+      packets[i].progress += packets[i].speed;
+      if (packets[i].progress >= 1) {
+        rawNodes[packets[i].to].lastActivity = time;
+        packets.splice(i, 1);
+      }
+    }
+    hudPackets.textContent = packets.length + ' pacotes';
+
+    // Uptime
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+    const secs = String(elapsed % 60).padStart(2, '0');
+    hudUptime.textContent = `${mins}:${secs}`;
+
+    // Project all nodes
+    const projected = rawNodes.map(n => project(n.x, n.y, n.z));
+
+    // Sort connections by depth
+    const connDepths = connections.map((c, i) => {
+      const p1 = projected[c.from];
+      const p2 = projected[c.to];
+      return { idx: i, z: (p1.z + p2.z) / 2 };
+    }).sort((a, b) => a.z - b.z);
+
+    // Draw connections
+    for (const cd of connDepths) {
+      const c = connections[cd.idx];
+      const p1 = projected[c.from];
+      const p2 = projected[c.to];
+      const alpha = Math.max(0.03, Math.min(0.22, (p1.z + p2.z + 500) / 1000));
+      const isSelected = selectedNode && (selectedNode.id === c.from || selectedNode.id === c.to);
+      const isHover = hoverNode && (hoverNode.id === c.from || hoverNode.id === c.to);
+
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+
+      if (isSelected) {
+        ctx.strokeStyle = accentColor;
+        ctx.globalAlpha = Math.min(0.7, alpha * 3);
+        ctx.lineWidth = 2.5;
+      } else if (isHover) {
+        ctx.strokeStyle = textSecondary;
+        ctx.globalAlpha = Math.min(0.5, alpha * 2.5);
+        ctx.lineWidth = 1.8;
+      } else {
+        ctx.strokeStyle = textQuaternary;
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 1;
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw packets
+    const pktDepths = packets.map((p, i) => {
+      const p1 = projected[p.from];
+      const p2 = projected[p.to];
+      const z = p1.z + (p2.z - p1.z) * p.progress;
+      return { idx: i, z };
+    }).sort((a, b) => a.z - b.z);
+
+    for (const pd of pktDepths) {
+      const pkt = packets[pd.idx];
+      const p1 = projected[pkt.from];
+      const p2 = projected[pkt.to];
+      const x = p1.x + (p2.x - p1.x) * pkt.progress;
+      const y = p1.y + (p2.y - p1.y) * pkt.progress;
+      const z = p1.z + (p2.z - p1.z) * pkt.progress;
+      const scale = Math.max(0.25, (z + 500) / 600);
+      const size = 6 * camera.zoom * scale;
+      const isSelected = selectedPacket && selectedPacket.id === pkt.id;
+
+      // Trail
+      const trailLen = 0.08;
+      const tx = p1.x + (p2.x - p1.x) * Math.max(0, pkt.progress - trailLen);
+      const ty = p1.y + (p2.y - p1.y) * Math.max(0, pkt.progress - trailLen);
+      const grad = ctx.createLinearGradient(tx, ty, x, y);
+      const color = pkt.priority === 'urgent' ? warningColor : accentColor;
+      grad.addColorStop(0, 'transparent');
+      grad.addColorStop(1, color);
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(x, y);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = size * 0.6;
+      ctx.globalAlpha = 0.4;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Packet dot
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = isSelected ? 1 : 0.9;
+      ctx.fill();
+
+      if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(x, y, size + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.4;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw nodes (sorted by depth)
+    const nodeDepths = projected.map((p, i) => ({ idx: i, z: p.z })).sort((a, b) => a.z - b.z);
+
+    for (const nd of nodeDepths) {
+      const node = rawNodes[nd.idx];
+      const p = projected[nd.idx];
+      const scale = Math.max(0.25, (p.z + 500) / 500);
+      const r = 20 * camera.zoom * scale;
+      const isHover = hoverNode && hoverNode.id === node.id;
+      const isSelected = selectedNode && selectedNode.id === node.id;
+      const isActive = time - node.lastActivity < 2;
+
+      // Outer glow for selected/hover
+      if (isSelected || isHover) {
+        const glowR = r + (isSelected ? 16 : 8);
+        const grad = ctx.createRadialGradient(p.x, p.y, r, p.x, p.y, glowR);
+        grad.addColorStop(0, accentColor.replace(')', ', 0.25)').replace('rgb', 'rgba'));
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Node body
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = isSelected ? 'var(--bg-panel)' : 'var(--bg-card)';
+      ctx.fill();
+
+      // Ring
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = isSelected ? accentColor : (isHover ? textSecondary : borderColor);
+      ctx.lineWidth = isSelected ? 3 : (isHover ? 2 : 1.5);
+      ctx.stroke();
+
+      // Inner dot
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 0.32, 0, Math.PI * 2);
+      ctx.fillStyle = isSelected ? accentColor : (isActive ? positiveColor : textTertiary);
+      ctx.fill();
+
+      // Pulse ring for active nodes
+      if (isActive || isSelected) {
+        const pulse = Math.sin(time * 4 + node.id) * 0.5 + 0.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r + 5 + pulse * 5, 0, Math.PI * 2);
+        ctx.strokeStyle = positiveColor.replace(')', `, ${pulse * 0.35})`).replace('rgb', 'rgba');
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+
+      // Label
+      if (scale > 0.45 || isSelected || isHover) {
+        ctx.font = `${isSelected ? '600' : '500'} ${Math.max(10, 13 * scale)}px var(--font-sans)`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = isSelected ? textPrimary : textSecondary;
+        ctx.fillText(node.name, p.x, p.y + r + 7);
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  // Hide loading after a brief moment
+  setTimeout(() => {
+    loading.classList.add('hidden');
+    setTimeout(() => loading.style.display = 'none', 600);
+  }, 800);
+
+  draw();
+})();
+</script>
+</body>
+</html>
+'''
+
+with open('/mnt/agents/output/simulador_rede_mesh.html', 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+print("Arquivo salvo com sucesso!")
+print(f"Tamanho: {len(html_content):,} caracteres")
